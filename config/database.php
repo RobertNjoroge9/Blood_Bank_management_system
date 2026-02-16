@@ -3,7 +3,7 @@
 $db_host = 'localhost';
 $db_name = 'msingico_bloodbank';        // Your cPanel database name
 $db_user = 'msingico_bloodbank_user';    // Your cPanel username
-$db_pass = 'msingico_bloodbank_user';         // Your cPanel password
+$db_pass = 'msingico_bloodbank';         // Your cPanel password
 
 try {
     $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass);
