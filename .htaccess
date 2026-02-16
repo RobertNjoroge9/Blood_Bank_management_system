@@ -1,0 +1,34 @@
+# .htaccess - Blood Bank Management System
+Options -Indexes
+DirectoryIndex index.php
+
+# Enable rewrite engine
+RewriteEngine On
+
+# Set base directory (root)
+RewriteBase /
+
+# Handle 404 errors
+ErrorDocument 404 /404.php
+
+# Prevent directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "(config\.php|database\.php|\.sql|\.log)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Redirect to login if accessing protected directories directly
+RewriteRule ^(donor|receiver|admin|config|includes)/?$ /login.php [R=302,L]
+
+# Pretty URLs (optional)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^/]+)/?$ index.php?page=$1 [QSA,L]
