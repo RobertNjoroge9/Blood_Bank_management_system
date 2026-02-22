@@ -3,14 +3,13 @@
 require_once '../includes/auth.php';
 require_once '../config/database.php';
 
-// Allow public access to search donors (uncomment below to restrict to logged-in users only)
-// requireLogin();
+// Allow public access to search donors
+// requireLogin(); // Uncomment to restrict to logged-in users only
 
 $donors = [];
 $search_performed = false;
 $error = '';
 
-// Get blood groups for dropdown
 $blood_groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
@@ -49,28 +48,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
         $error = "Database error: " . $e->getMessage();
     }
 }
+
+// Get statistics
+$stmt = $pdo->query("
+    SELECT blood_group, COUNT(*) as count 
+    FROM donor_profiles 
+    WHERE is_available = 1 
+    GROUP BY blood_group
+");
+$stats = $stmt->fetchAll();
+$stats_by_group = [];
+foreach($stats as $stat) {
+    $stats_by_group[$stat['blood_group']] = $stat['count'];
+}
 ?>
 <?php include '../includes/header.php'; ?>
 
 <div class="row mb-4">
     <div class="col-md-12">
-        <h2><i class="bi bi-search text-danger"></i> Search Blood Donors</h2>
-        <p class="lead">Find blood donors by blood group and location to save lives</p>
+        <h2><i class="bi bi-search text-primary"></i> Find Blood Donors</h2>
+        <p class="lead">Search for blood donors by blood group and location</p>
     </div>
 </div>
 
 <?php if($error): ?>
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="bi bi-exclamation-triangle-fill"></i> <?php echo htmlspecialchars($error); ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
+    <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
 <?php endif; ?>
 
 <div class="row">
-    <!-- Search Filters Column -->
+    <!-- Search Filters -->
     <div class="col-md-4">
         <div class="card shadow mb-4">
-            <div class="card-header bg-danger text-white">
+            <div class="card-header bg-primary text-white">
                 <h5 class="mb-0"><i class="bi bi-funnel"></i> Search Filters</h5>
             </div>
             <div class="card-body">
@@ -81,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
                             <option value="">All Blood Groups</option>
                             <?php foreach($blood_groups as $bg): ?>
                                 <option value="<?php echo $bg; ?>" <?php echo (isset($_GET['blood_group']) && $_GET['blood_group'] == $bg) ? 'selected' : ''; ?>>
-                                    <?php echo $bg; ?>
+                                    <?php echo $bg; ?> (<?php echo $stats_by_group[$bg] ?? 0; ?> available)
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -94,50 +103,71 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
                                placeholder="Enter city or area">
                     </div>
                     
-                    <button type="submit" name="search" class="btn btn-danger w-100">
+                    <button type="submit" name="search" class="btn btn-primary w-100">
                         <i class="bi bi-search"></i> Search Donors
                     </button>
                 </form>
             </div>
         </div>
         
+        <!-- Quick Stats -->
         <div class="card shadow mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Quick Tips</h5>
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Available Donors</h5>
             </div>
             <div class="card-body">
-                <ul class="mb-0">
-                    <li>Leave all fields empty to see all available donors</li>
-                    <li>Select blood group for specific match</li>
-                    <li>Enter location to find nearby donors</li>
-                    <li>Contact donors directly via phone or message</li>
-                    <li>Donors marked with <span class="badge bg-warning">Recent</span> have donated recently</li>
-                </ul>
+                <div class="row text-center">
+                    <?php foreach(['O+', 'A+', 'B+', 'AB+'] as $bg): ?>
+                        <div class="col-6 mb-2">
+                            <div class="border rounded p-2">
+                                <strong class="text-danger"><?php echo $bg; ?></strong>
+                                <br>
+                                <span class="badge bg-success"><?php echo $stats_by_group[$bg] ?? 0; ?></span>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <hr>
+                <p class="text-center mb-0">
+                    <strong>Total Available:</strong> 
+                    <?php echo array_sum($stats_by_group); ?> donors
+                </p>
             </div>
         </div>
         
-        <div class="card shadow mb-4">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-heart"></i> Why Donate Blood?</h5>
+        <!-- Compatibility Guide -->
+        <div class="card shadow">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-droplet"></i> Blood Compatibility</h5>
             </div>
             <div class="card-body">
-                <p>One blood donation can save up to three lives. Blood is needed for:</p>
-                <ul>
-                    <li>Accident victims</li>
-                    <li>Surgery patients</li>
-                    <li>Cancer patients</li>
-                    <li>Mothers with complications</li>
-                    <li>Premature babies</li>
-                </ul>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Your Blood</th>
+                            <th>Can Receive From</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>O-</td><td>O-</td></tr>
+                        <tr><td>O+</td><td>O+, O-</td></tr>
+                        <tr><td>A-</td><td>A-, O-</td></tr>
+                        <tr><td>A+</td><td>A+, A-, O+, O-</td></tr>
+                        <tr><td>B-</td><td>B-, O-</td></tr>
+                        <tr><td>B+</td><td>B+, B-, O+, O-</td></tr>
+                        <tr><td>AB-</td><td>AB-, A-, B-, O-</td></tr>
+                        <tr><td>AB+</td><td>All types</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
     
-    <!-- Results Column -->
+    <!-- Search Results -->
     <div class="col-md-8">
         <div class="card shadow">
-            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-people"></i> Available Donors</h5>
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Search Results</h5>
                 <?php if($search_performed): ?>
                     <span class="badge bg-light text-dark"><?php echo count($donors); ?> donor(s) found</span>
                 <?php endif; ?>
@@ -148,14 +178,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
                         <div class="row">
                             <?php foreach($donors as $donor): ?>
                             <div class="col-md-6 mb-3">
-                                <div class="card h-100 border-danger">
+                                <div class="card h-100 border-primary">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h5 class="card-title text-danger mb-0">
+                                            <h5 class="card-title text-primary mb-0">
                                                 <i class="bi bi-person-circle"></i> 
                                                 <?php echo htmlspecialchars($donor['full_name']); ?>
                                             </h5>
-                                            <span class="badge bg-danger fs-6"><?php echo $donor['blood_group']; ?></span>
+                                            <span class="badge bg-primary fs-6"><?php echo $donor['blood_group']; ?></span>
                                         </div>
                                         
                                         <p class="card-text">
@@ -178,24 +208,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
                                                         echo ' <span class="badge bg-warning text-dark">Recent</span>';
                                                     }
                                                 } else {
-                                                    echo '<span class="badge bg-success">Never donated - Ready to donate</span>';
+                                                    echo '<span class="badge bg-success">Ready to donate</span>';
                                                 }
                                                 ?>
                                             </small>
                                         </p>
                                         
                                         <div class="mt-3">
-                                            <?php if(isset($_SESSION['user_id'])): ?>
-                                                <a href="<?php echo BASE_PATH; ?>messages/send.php?receiver_id=<?php echo $donor['id']; ?>" 
-                                                   class="btn btn-sm btn-outline-danger">
-                                                    <i class="bi bi-chat"></i> Contact
+                                            <?php if(isset($_SESSION['user_id']) && $_SESSION['user_type'] == 'receiver'): ?>
+                                                <a href="../messages/send.php?receiver_id=<?php echo $donor['id']; ?>" 
+                                                   class="btn btn-sm btn-primary">
+                                                    <i class="bi bi-chat"></i> Contact Donor
                                                 </a>
                                                 <button class="btn btn-sm btn-outline-secondary" 
                                                         onclick="copyPhone('<?php echo $donor['phone']; ?>')">
                                                     <i class="bi bi-files"></i> Copy Phone
                                                 </button>
-                                            <?php else: ?>
-                                                <a href="<?php echo BASE_PATH; ?>login.php" class="btn btn-sm btn-outline-secondary">
+                                            <?php elseif(!isset($_SESSION['user_id'])): ?>
+                                                <a href="../login.php" class="btn btn-sm btn-outline-primary">
                                                     <i class="bi bi-box-arrow-in-right"></i> Login to Contact
                                                 </a>
                                             <?php endif; ?>
@@ -210,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
                             <i class="bi bi-emoji-frown display-1 text-muted"></i>
                             <h5 class="mt-3">No donors found</h5>
                             <p class="text-muted">Try adjusting your search criteria or check back later</p>
-                            <a href="<?php echo BASE_PATH; ?>receiver/search-donors.php" class="btn btn-outline-danger">
+                            <a href="search-donors.php" class="btn btn-outline-primary">
                                 <i class="bi bi-arrow-counterclockwise"></i> Clear Filters
                             </a>
                         </div>
@@ -218,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['search'])) {
                 <?php else: ?>
                     <div class="text-center py-5">
                         <i class="bi bi-search display-1 text-muted"></i>
-                        <h5 class="mt-3">Start Searching</h5>
+                        <h5 class="mt-3">Start Searching for Donors</h5>
                         <p class="text-muted">Use the filters on the left to find blood donors in your area</p>
                     </div>
                 <?php endif; ?>
